@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html data-require="math calculus2 polynomials2 expressions2 mathquill_editor">
+<head>
+	<meta charset="UTF-8" />
+	<title>Product rule</title>
+	<script src="../khan-exercise.js"></script>
+<style type="text/css">
+.button { padding:2px; vertical-align:middle; width:100%; height:100%;}
+.ops { border-spacing:4px; border-collapse:separate;}
+.ops td { text-align:center; border: solid blue 1px; width:30px;}
+</style>
+        <link rel="stylesheet" type="text/css" href="../utils/mathquill/mathquill.css">
+</head>
+<body>
+	<div class="exercise">
+		<div class="vars" data-ensure="FUNCN.fText !== FUNCD.fText">
+			<var id="FUNCN">generateSpecialFunction("x")</var>
+			<var id="FUNCD">generateSpecialFunction("x")</var>
+			<var id="FUNCF">{op:"*", params:[FUNCN, FUNCD]}</var>
+
+			<var id="NOTATION">funcNotation("x")</var>
+		</div>
+
+		<div class="problems">
+			<div>
+				<div class="question">
+					<p>
+						<table><tr><td style="vertical-align:top">
+							<code>\displaystyle \frac{d}{dx} \bigl((<var>FUNCN.fText</var>)(<var>FUNCD.fText</var>)\bigr)</code> = </td><td><span id="editable-math" class="mathquill-editable" style="width:200px"></span><br/><br/><table class="ops" id="testTable"><tbody></tbody></table></td></tr></table>
+<script language="text/javascript">
+$('.mathquill-editable').mathquill('editable');
+$('.mathquill-editable').focus();
+mathquillSetup("testTable", 5, ["sqrt", "sin", "cos", "tan", "sec", "ln", "^", "_", "("]);
+</script>
+</p>
+				</div>
+			</div>
+		</div>
+
+<div class="solution" data-type="custom">
+    <div class="instruction">
+        Enter your answer in the text box.
+    </div>
+    <div class="guess"> [0,0] </div>
+    <div class="validator-function">
+        var sol = {op:"+", params:[{op:"*", params:[FUNCN.f, FUNCD.ddxF]}, {op:"*", params:[FUNCD.f, FUNCN.ddxF]}]};
+        return mathquillCheckAnswer(sol);
+    </div>
+    <div class="show-guess">
+    </div>
+    <div class="example">An expression, such as: <code>x^2+3</code></div>
+</div>
+		<div class="hints">
+			<p>We know <code>\displaystyle \frac{d}{dx} \bigl( f(x) g(x) \bigr) = f'(x)g(x) + g'(x)f(x)</code>.</p>
+			<div>
+				<p>In this case,</p>
+				<p><code>\qquad f(x) = <var>FUNCN.fText</var></code>,</p>
+				<p><code>\qquad g(x) = <var>FUNCD.fText</var></code>.</p>
+			</div>
+			<p>Differentiate each function:</p>
+			<p><code>\qquad f'(x) = <var>FUNCN.ddxFText</var></code>,</p>
+			<p><code>\qquad g'(x) = <var>FUNCD.ddxFText</var></code>.</p>
+			<div>
+				<p>Thus, the answer is</p>
+				<p><code>\qquad {(<var>FUNCN.ddxFText</var>)(<var>FUNCD.fText</var>) + (<var>FUNCD.ddxFText</var>)(<var>FUNCN.fText</var>)}</code>.</p>
+			</div>
+		</div>
+	</div>
+</body>
+</html>
