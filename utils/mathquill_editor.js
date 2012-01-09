@@ -3111,7 +3111,7 @@ var mathquillSetup = function(tableId, nbColumns, functions) {
        var tip = "";
        if (fnData.tip)
           tip = "<span class='simple-button-tip'><br>" + fnData.tip + "</span>";
-       var td = tr.append("<td onclick=\""+clickCall+"\"><span style='display:block;height:50px;basline:middle;' class='simple-button action-gradient'>" + fnData.html + "</span>" + tip + "</td>");
+       var td = tr.append("<td onclick=\""+clickCall+"\"><span style='display:block;' class='simple-button action-gradient'>" + fnData.html + "</span>" + tip + "</td>");
        col++;
     }
 }
