@@ -5,9 +5,11 @@
 	<title>Product rule</title>
 	<script src="../khan-exercise.js"></script>
 <style type="text/css">
-.button { padding:2px; vertical-align:middle; width:100%; height:100%;}
-.ops { border-spacing:4px; border-collapse:separate;}
-.ops td { text-align:center; border: solid blue 1px; width:30px;}
+.simple-button-tip { font-size: 0.7em; margin:0px;padding:0px;}
+.ops sup { vertical-align: super; }
+.ops sub { vertical-align: sub; }
+.ops td { text-align:center; width:50px; margin:0px; vertical-align:baseline;}
+.ops div { width:45px; height:20px; vertical-align:middle;}
 </style>
         <link rel="stylesheet" type="text/css" href="../utils/mathquill/mathquill.css">
 </head>
@@ -28,7 +30,8 @@
 						<table><tr><td style="vertical-align:top">
 							<code>\displaystyle \frac{d}{dx} \bigl((<var>FUNCN.fText</var>)(<var>FUNCD.fText</var>)\bigr)</code> = </td><td><span id="editable-math" class="mathquill-editable" style="width:200px"></span><br/><br/><table class="ops" id="testTable"><tbody></tbody></table></td></tr></table>
 <script language="text/javascript">
-$('.mathquill-editable').mathquill('editable');
+var acceptedCmds = {"sin":1, "cos":1, "tan":1, "sec":1, "sqrt":1, "ln":1, "asin":1, "acos":1, "sinh":1, "cosh":1, "+":1, "-":1, "^":1, "_":1, "(":1, ")":1, "*":1, "/":1};
+$('.mathquill-editable').mathquill('editable', undefined, acceptedCmds);
 $('.mathquill-editable').focus();
 mathquillSetup("testTable", 5, ["sqrt", "sin", "cos", "tan", "sec", "ln", "^", "_", "("]);
 </script>

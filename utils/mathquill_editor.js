@@ -232,11 +232,118 @@ _.latex = function() {
   });
 };
 _.expr = function() {
+  function isDigit(ch) {
+    return /^\d$/.test(ch);
+  }
+
+  function isLetter(ch) {
+    return /^[a-zA-Z]+$/.test(ch);
+  }
+
+  function trim (str) {
+    if (typeof(str) !== "string")
+      return str;
+    return str.replace(/^\s+/g,'').replace(/\s+$/g,'')
+  } 
+
+  function readNextToken() {
+    var item;
+    curValue = "";
+    if (curIndex >= items.length) {
+      curToken = 0;
+      return;
+    }
+    item = items[curIndex];
+    if (trim(item) === "\\cdot")
+      item = "*";
+    if ((item == "*") || (item == "+") || (item == "-")) {
+      curIndex++;
+      curValue = item;
+      curToken = item;
+    }
+    else if (isDigit(item)) {
+      curValue = readFloat(item);
+      curToken = "number";
+    }
+    else {
+      curIndex++;
+      curValue = item;
+      curToken = "elem";
+    }
+  }
+
+  function readFloat(item) {
+    var str = "";
+    while (isDigit(item) || (item == ".")) {
+      str += item;
+      curIndex++;
+      item = items[curIndex];
+    }
+    return parseFloat(str);
+  }
+
+  function primaryExpr () {
+    var expr;
+    expr = curValue;
+    readNextToken();
+    return expr;
+  }
+
+  function unaryExpr() {
+    var expr;
+    if ((curToken == "+") || (curToken == "-")) {
+      var prevToken = curToken;
+      readNextToken();
+      expr = {op:curValue, params:[unaryExpr()]};
+    }
+    else
+      expr = primaryExpr();
+    return expr;
+  }
+
+  function multiplicativeExpr() {
+    var stack = [unaryExpr()];
+
+    while(curToken === "elem") {
+      var expr2 = primaryExpr();
+      if ((typeof(expr2) === "object") && (expr2.op == "^")) {
+        var last = stack.pop();
+        stack.push({op:"^", params:[last, expr2.params[0]]});
+      }
+      else
+        stack.push(expr2);
+    }
+    expr = stack.pop();
+    while (stack.length > 0) {
+      expr = {op:"*", params:[stack.pop(), expr]};
+    }
+
+    while (curToken == "*") {
+      readNextToken();
+      expr = {op:"*", params:[expr, multiplicativeExpr()]};
+    }
+    return expr;
+  }
+
+  function additiveExpr() {
+    var expr = multiplicativeExpr();
+    while ((curToken == "+") || (curToken == "-")) {
+      var prevToken = curToken;
+      readNextToken();
+      expr = {op:prevToken, params:[expr, multiplicativeExpr()]};
+    }
+    return expr;
+  }
   var items = this.foldChildren([], function(items, child) {
-	  items.push(child.expr());
-	  return items;
+    items.push(child.expr());
+    return items;
   });
-  return parseItems(items);
+  var curToken = 0;
+  var curIndex = 0;
+  var curValue = "";
+
+  readNextToken();
+  return additiveExpr();
 }
 
 _.text = function() {
@@ -333,12 +440,8 @@ _.checkPlaceholders = function() {
   this.cursor.prependTo(this);
   this.cursor.checkPlaceholder(false, true);
   this.cursor.appendTo(this);
-  //tmpCursor.hide();
-  //tmpCursor.insertAt(newBlock, newBlock.lastChild, undefined);
-  //tmpCursor.jQ.insertAfter(newBlock.lastChild.jQ);
   this.cursor.checkPlaceholder(false, true);
   this.renderCommand();
- // this.cursor.hide();
 }
 
 /*********************************************
@@ -475,6 +578,7 @@ function createRoot(jQ, root, textbox, editable) {
       cursor.selection.jQ.addClass('blur');
     e.stopPropagation();
   });
+
   jQ.bind('focus.mathquill blur.mathquill', function(e) {
     textarea.trigger(e);
   }).bind('mousedown.mathquill', function() {
@@ -1197,7 +1301,6 @@ _.textInput = function(ch) {
   this.cursor.deleteSelection();
   if (ch !== '$')
     this.write(ch);
-/*
   else if (this.isEmpty())
     this.cursor.insertAfter(this).backspace().insertNew(new VanillaSymbol('\\$','$'));
   else if (!this.cursor.next)
@@ -1217,7 +1320,6 @@ _.textInput = function(ch) {
     this.cursor.insertBefore(next);
     delete next.firstChild.focus;
   }
-*/
 };
 function InnerTextBlock(){}
 _ = InnerTextBlock.prototype = new MathBlock;
@@ -1281,7 +1383,7 @@ _.focus = function() {
   return this;
 };
 
-//CharCmds.$ =
+CharCmds.$ =
 LatexCmds.text =
 LatexCmds.textnormal =
 LatexCmds.textrm =
@@ -1391,7 +1493,7 @@ _.renderCommand = function() {
     this.replacedFragment.remove();
 };
 
-//CharCmds['\\'] = LatexCommandInput;
+CharCmds['\\'] = LatexCommandInput;
   
 function Binomial(replacedFragment) {
   this.init('\\binom', undefined, undefined, replacedFragment);
@@ -1554,7 +1656,7 @@ function VanillaSymbol(ch, html) {
 }
 VanillaSymbol.prototype = Symbol.prototype;
 
-//CharCmds[' '] = bind(VanillaSymbol, '\\:', ' ');
+CharCmds[' '] = bind(VanillaSymbol, '\\:', ' ');
 
 LatexCmds.prime = CharCmds["'"] = bind(VanillaSymbol, "'", '&prime;');
 
@@ -1563,9 +1665,9 @@ function NonSymbolaSymbol(ch, html) { //does not use Symbola font
 }
 NonSymbolaSymbol.prototype = Symbol.prototype;
 
-//LatexCmds['@'] = NonSymbolaSymbol;
-//LatexCmds['&'] = bind(NonSymbolaSymbol, '\\&', '&');
-//LatexCmds['%'] = bind(NonSymbolaSymbol, '\\%', '%');
+LatexCmds['@'] = NonSymbolaSymbol;
+LatexCmds['&'] = bind(NonSymbolaSymbol, '\\&', '&');
+LatexCmds['%'] = bind(NonSymbolaSymbol, '\\%', '%');
 
 //the following are all Greek to me, but this helped a lot: http://www.ams.org/STIX/ion/stixsig03.html
 
@@ -2308,8 +2410,10 @@ _.writeLatex = function(latex) {
         var cmd = LatexCmds[token];
         if (cmd) {
           cursor.insertNew(cmd = new cmd(undefined, token));
-          //start test Mathias (trying to fix paste)
-          if (ListedCmds[token]) {
+          //delete extra closing parenthesis that are added when pasting
+          //latex content that includes functions. There has to be a better way
+          //to deal with this issue
+          if (this.isAcceptedCmd(token)) {
              latex.shift();
              var count = 0;
              for (var iPos = 0; iPos < latex.length; iPos++) {
@@ -2323,8 +2427,6 @@ _.writeLatex = function(latex) {
                 }
              }
           }
-          // end test
-
         }
         else {
           cmd = new TextBlock(token);
@@ -2361,8 +2463,6 @@ _.write = function(ch) {
   return this.show().insertCh(ch);
 };
 
-var ListedCmds = {"sin":1, "cos":1, "tan":1, "sec":1, "sqrt":1, "ln":1, "asin":1, "acos":1, "sinh":1, "cosh":1};
-
 _.checkFunctionName = function(ch) {
   if (this.checking)
      return true;
@@ -2374,7 +2474,7 @@ _.checkFunctionName = function(ch) {
   var cmdName;
   while (start && (start instanceof Variable)) {
     name = start.text_template + name;
-    if (ListedCmds[name]) {
+    if (this.isAcceptedCmd(name)) {
        cmd = LatexCmds[name];
        cmdPrev = start.prev;
        cmdName = name;
@@ -2382,20 +2482,16 @@ _.checkFunctionName = function(ch) {
     start = start.prev;
   }
   var keepCh = true;
-  if ((cmd) && (!ListedCmds[cmdName + ch])) {
+  if ((cmd) && (!this.isAcceptedCmd(cmdName + ch))) {
      while (this.prev != cmdPrev)
         this.prev = this.prev.remove().prev;
      this.insertCh(cmdName);
-     //if ((cmdName != "sqrt") && (ch != "(")) {
-     //   this.insertCh("(");
-     //}
      if (ch == "(")
         keepCh = false;
   }
   this.checking = false;
   return keepCh;
 }
-
 _.insertCh = function(ch) {
   if (this.selection) {
     //gotta do this before this.selection is mutated by 'new cmd(this.selection)'
@@ -2408,13 +2504,15 @@ _.insertCh = function(ch) {
   var cmd;
   if (ch.match(/^[a-eg-zA-Z]$/)) //exclude f because want florin
     cmd = new Variable(ch);
-  else if (cmd = CharCmds[ch] || LatexCmds[ch])
+  else if ((cmd = CharCmds[ch]) && (this.isAcceptedCmd(ch)))
     cmd = new cmd(this.selection, ch);
-  else if (ch.charAt(0) == "²") {
+  else if ((cmd = LatexCmds[ch]) && (this.isAcceptedCmd(ch)))
+    cmd = new cmd(this.selection, ch);
+  else if ((ch.charAt(0) == "²") && (this.isAcceptedCmd("^"))) {
      this.insertCh("^");
-     this.insertCh("2");
+     cmd = new VanillaSymbol("2");
   }
-  else if (ch.match(/^[0-9.]$/))
+  else if ((ch.match(/^[0-9.]$/)) | (this.isAcceptedCmd(ch)))
     cmd = new VanillaSymbol(ch);
   else
     return this;
@@ -2425,14 +2523,12 @@ _.insertCh = function(ch) {
     delete this.selection;
   }
 
-  this.insertNew(cmd);
-  return this;
+  return this.insertNew(cmd);
 };
 _.insertNew = function(cmd) {
   cmd.insertAt(this);
   return this;
 };
-
 _.getCmdType = function(cmd) {
    if (!cmd)
       return "NO";
@@ -2442,8 +2538,11 @@ _.getCmdType = function(cmd) {
       else
          return "SB";
    }
-   if (cmd instanceof BinaryOperator)
+   if (cmd instanceof BinaryOperator) {
+      if (cmd.cmd === "-")
+         return "UN";
       return "OP";
+   }
    if (cmd instanceof VanillaSymbol) {
       var value = cmd.text_template;
       if (value == "")
@@ -2455,7 +2554,6 @@ _.getCmdType = function(cmd) {
    }
    return "VA";
 }
-
 _.insertPlaceholderIfNeeded = function(stayLeft) {
   while (this.getCmdType(this.next) == "PH")
      this.next = this.next.remove().next;
@@ -2465,13 +2563,14 @@ _.insertPlaceholderIfNeeded = function(stayLeft) {
   var typePrev = this.getCmdType(this.prev);
 
   var actions = {
-     "VA": {"VA":0 , "NB":1 , "OP":0 , "NO":0 , "PT":1, "SP":0, "SB":0},
-     "NB": {"VA":0 , "NB":0 , "OP":0 , "NO":0 , "PT":0, "SP":0, "SB":0},
-     "OP": {"VA":0 , "NB":0 , "OP":1 , "NO":1 , "PT":1, "SP":1, "SB":1},
-     "NO": {"VA":0 , "NB":0 , "OP":1 , "NO":1 , "PT":1, "SP":1, "SB":1},
-     "PT": {"VA":1 , "NB":0 , "OP":1 , "NO":1 , "PT":2, "SP":1, "SB":1},
-     "SP": {"VA":0 , "NB":1 , "OP":0 , "NO":0 , "PT":1, "SP":1, "SB":1},
-     "SB": {"VA":0 , "NB":1 , "OP":0 , "NO":0 , "PT":1, "SP":0, "SB":1},
+     "VA": {"VA":0, "NB":1, "OP":0, "UN":0, "NO":0, "PT":1, "SP":0, "SB":0},
+     "NB": {"VA":0, "NB":0, "OP":0, "UN":0, "NO":0, "PT":0, "SP":0, "SB":0},
+     "OP": {"VA":0, "NB":0, "OP":1, "UN":0, "NO":1, "PT":1, "SP":1, "SB":1},
+     "UN": {"VA":0, "NB":0, "OP":1, "UN":1, "NO":1, "PT":1, "SP":1, "SB":1},
+     "NO": {"VA":0, "NB":0, "OP":1, "UN":0, "NO":1, "PT":1, "SP":1, "SB":1},
+     "PT": {"VA":1, "NB":0, "OP":1, "UN":1, "NO":1, "PT":2, "SP":1, "SB":1},
+     "SP": {"VA":0, "NB":1, "OP":0, "UN":0, "NO":0, "PT":1, "SP":1, "SB":1},
+     "SB": {"VA":0, "NB":1, "OP":0, "UN":0, "NO":0, "PT":1, "SP":0, "SB":1},
   };
   switch(actions[typePrev][typeNext]) {
     case 0:
@@ -2488,7 +2587,6 @@ _.insertPlaceholderIfNeeded = function(stayLeft) {
       break;
   }
 }
-
 _.checkPlaceholder = function(onLeft, onRight) {
   if (this.checking)
     return;
@@ -2503,7 +2601,6 @@ _.checkPlaceholder = function(onLeft, onRight) {
   }
   this.checking = false;
 }
-
 _.selectToValidate = function() {
    if (this.checking)
       return;
@@ -2536,7 +2633,6 @@ _.selectToValidate = function() {
    }
    this.checking = false;
 }
-
 _.retractLeftToValidate = function() {
   var cmdType = this.getCmdType(this.selection.next.prev);
   while ((cmdType == "OP") || (cmdType == "PT")) {
@@ -2552,7 +2648,6 @@ _.retractLeftToValidate = function() {
   }
   return true;
 }
-
 _.retractRightToValidate = function() {
   var cmdType = this.getCmdType(this.selection.prev.next);
   while ((cmdType == "OP") || (cmdType == "PT") || (cmdType == "SP") || (cmdType == "SB")) {
@@ -2568,7 +2663,6 @@ _.retractRightToValidate = function() {
   }
   return true;
 }
-
 _.unwrapGramp = function() {
   var gramp = this.parent.parent,
     greatgramp = gramp.parent,
@@ -2718,7 +2812,6 @@ _.selectFrom = function(anticursor) {
   this.insertAfter(right.next.prev || right.parent.lastChild);
   this.root.selectionChanged();
 };
-
 _.selectLeft = function() {
   if (this.selection) {
     if (this.selection.prev === this.prev) { //if cursor is at left edge of selection;
@@ -2756,7 +2849,6 @@ _.selectLeft = function() {
   }
   this.root.selectionChanged();
 };
-
 _.selectRight = function() {
   if (this.selection) {
     if (this.selection.next === this.next) { //if cursor is at right edge of selection;
@@ -2814,6 +2906,11 @@ _.deleteSelection = function() {
   this.root.selectionChanged();
   return true;
 };
+_.isAcceptedCmd = function(cmdStr) {
+  if (this.root.acceptedCmds === undefined)
+     return true;
+  return (this.root.acceptedCmds[cmdStr] === 1);
+}
 
 function Selection(parent, prev, next) {
   MathFragment.apply(this, arguments);
@@ -2855,7 +2952,7 @@ _.detach = function() {
 
 //The publicy exposed method of jQuery.prototype, available (and meant to be
 //called) on jQuery-wrapped HTML DOM elements.
-$.fn.mathquill = function(cmd, latex) {
+$.fn.mathquill = function(cmd, latex, acceptedCmds) {
   switch (cmd) {
   case 'redraw':
     this.find(':not(:has(:first))').each(function() {
@@ -2905,132 +3002,23 @@ $.fn.mathquill = function(cmd, latex) {
       editable = textbox || cmd === 'editable',
       RootBlock = textbox ? RootTextBlock : RootMathBlock;
     return this.each(function() {
-      createRoot($(this), new RootBlock, textbox, editable);
+      var root = new RootBlock;
+      root.acceptedCmds = acceptedCmds;
+      createRoot($(this), root, textbox, editable);
     });
   }
-};
-
-function parseItems(src) {
-   var curToken = 0;
-   var curIndex = 0;
-   var curValue = "";
-
-   function isDigit(ch) {
-      return /^\d$/.test(ch);
-   }
-
-   function isLetter(ch) {
-      return /^[a-zA-Z]+$/.test(ch);
-   }
-
-   function trim (str) {
-      if (typeof(str) !== "string")
-         return str;
-      return str.replace(/^\s+/g,'').replace(/\s+$/g,'')
-   } 
-
-   function readNextToken() {
-      var item;
-      curValue = "";
-      if (curIndex >= src.length) {
-         curToken = 0;
-         return;
-      }
-      item = src[curIndex];
-      if (trim(item) === "\\cdot")
-         item = "*";
-      if ((item == "*") || (item == "+") || (item == "-")) {
-         curIndex++;
-         curValue = item;
-         curToken = item;
-      }
-      else if (isDigit(item)) {
-         curValue = readFloat(item);
-         curToken = "number";
-      }
-      else {
-         curIndex++;
-         curValue = item;
-         curToken = "elem";
-      }
-   }
-
-   function readFloat(item) {
-      var str = "";
-      while (isDigit(item) || (item == ".")) {
-         str += item;
-         curIndex++;
-         item = src[curIndex];
-      }
-      return parseFloat(str);
-   }
-
-   function primaryExpr () {
-      var expr;
-      expr = curValue;
-      readNextToken();
-      return expr;
-   }
-
-   function unaryExpr() {
-      var expr;
-      if ((curToken == "+") || (curToken == "-")) {
-         var prevToken = curToken;
-         readNextToken();
-         expr = {op:curValue, params:[unaryExpr()]};
-      }
-      else
-         expr = primaryExpr();
-      return expr;
-   }
-
-   function multiplicativeExpr() {
-      var stack = [unaryExpr()];
-
-      while(curToken === "elem") {
-         var expr2 = primaryExpr();
-         if ((typeof(expr2) === "object") && (expr2.op == "^")) {
-            var last = stack.pop();
-            stack.push({op:"^", params:[last, expr2.params[0]]});
-         }
-         else
-            stack.push(expr2);
-      }
-      expr = stack.pop();
-      while (stack.length > 0) {
-         expr = {op:"*", params:[stack.pop(), expr]};
-      }
-
-      while (curToken == "*") {
-         readNextToken();
-         expr = {op:"*", params:[expr, multiplicativeExpr()]};
-      }
-      return expr;
-   }
-
-   function additiveExpr() {
-      var expr = multiplicativeExpr();
-      while ((curToken == "+") || (curToken == "-")) {
-         var prevToken = curToken;
-         readNextToken();
-         expr = {op:prevToken, params:[expr, multiplicativeExpr()]};
-      }
-      return expr;
-   }
-
-   readNextToken();
-   return additiveExpr();
 };
 
 //on document ready, mathquill-ify all `<tag class="mathquill-*">latex</tag>`
 //elements according to their CSS class.
 $(function() {
-  $('.mathquill-editable').mathquill('editable');
+  $('.mathquill-editable:not(.mathquill-rendered-math)').mathquill('editable');
+  $('.mathquill-textbox:not(.mathquill-rendered-math)').mathquill('textbox');
+  $('.mathquill-embedded-latex').mathquill();
 });
 
 
 }());
-
 var jQueryDataKey = '[[mathquill internal data]]';
 
 function mathInsertCh(ch) {
@@ -3055,7 +3043,6 @@ function mathInsertFn(name) {
          var prev = cursor.selection.prev;
          var next = cursor.selection.next;
          var parent = cursor.selection.parent;
-         //mathInsertCh('(');
          cursor.hide();
          var newNext = parent.firstChild;
          if (prev)
@@ -3072,7 +3059,6 @@ function mathInsertFn(name) {
       }
       else {
 	 mathInsertCh(name);
-         //mathInsertCh('(');
       }
       block.blur();
    }
@@ -3082,8 +3068,6 @@ function mathInsertFn(name) {
 function isValueClose(expr1, expr2, x) {
    var val1 = KhanUtil.exprCompute(expr1, {"x": x, "e":Math.E});
    var val2 = KhanUtil.exprCompute(expr2, {"x": x, "e":Math.E});
-   //var val1 = evalExpression(expr1, {"x": x, "e":Math.E});
-   //var val2 = evalExpression(expr2, {"x": x, "e":Math.E});
    if (isNaN(val1) && isNaN(val2))
       return true;
    var diff = val2 - val1;
@@ -3094,9 +3078,6 @@ var mathquillCheckAnswer = function(solution) {
    var editable = $('.mathquill-editable');
    var data = editable.data(jQueryDataKey);
    var answer = data.block.expr();
-   //var part1 = {op:"*", params:[{op:"^", params:["e", "x"]}, {op:"\\tan(", params:["x"]}]};
-   //var part2 = {op:"*", params:[{op:"^", params:["e", "x"]}, {op:"^", params:[{op:"\\sec(", params:["x"]}, 2]}]};
-   //var solution = {op:"+", params:[part1, part2]};
    var xValues = [-2.1, -1.1, 0.1, 1.1, 2.1];
    for(var iValue = 0; xValues[iValue] !== undefined; iValue++) {
       if (!isValueClose(answer, solution, xValues[iValue])) {
@@ -3108,14 +3089,14 @@ var mathquillCheckAnswer = function(solution) {
 
 var mathquillSetup = function(tableId, nbColumns, functions) {
     var data = {
-    "sqrt": {html:"&radic;<span style='text-decoration:overline;'>&nbsp;</span>", callType:"Fn"},
+    "sqrt": {html:"&radic;<span style='text-decoration:overline;'>&nbsp;</span>", callType:"Fn", tip:"type sqrt"},
     "sin": {html:"sin", callType:"Fn"},
     "cos": {html:"cos", callType:"Fn"},
     "tan": {html:"tan", callType:"Fn"},
     "sec": {html:"sec", callType:"Fn"},
     "ln": {html:"ln", callType:"Fn"},
-    "^": {html:"x<sup>y</sup>", callType:"Ch"},
-    "_": {html:"x<sub>i</sub>", callType:"Ch"},
+    "^": {html:"x<sup>y</sup>", callType:"Ch", tip:"type ^"},
+    "_": {html:"x<sub>i</sub>", callType:"Ch", tip:"type _"},
     "(": {html:"(&nbsp;)", callType:"Ch"},
     };
 
@@ -3127,8 +3108,10 @@ var mathquillSetup = function(tableId, nbColumns, functions) {
        if (col == nbColumns)
           tr = $("#"+tableId).find('tbody').append($('<tr>'));
        var clickCall = "mathInsert" + fnData.callType + "('" + functions[iFn] + "')";
-       var td = tr.append("<td onclick=\""+clickCall+"\"><span class='button'>" + fnData.html + "</span></td>");
-       //str += "<td onclick=\"" + clickCall + "\"><span class='button'>" + fnData.html + "</span></td>";
+       var tip = "";
+       if (fnData.tip)
+          tip = "<span class='simple-button-tip'><br>" + fnData.tip + "</span>";
+       var td = tr.append("<td onclick=\""+clickCall+"\"><span style='display:block;height:50px;basline:middle;' class='simple-button action-gradient'>" + fnData.html + "</span>" + tip + "</td>");
        col++;
     }
 }
